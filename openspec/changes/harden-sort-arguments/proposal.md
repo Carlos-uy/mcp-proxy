@@ -35,8 +35,8 @@ This conflicts with the existing best-effort default argument hardening and cont
 ## Proposed Solution
 
 - Add a command-specific `sort` policy in `CommandValidator`, and map the GNU Coreutils alias `gsort` to the same policy.
-- Reject `--compress-program`, `-o`/`--output`, `--files0-from`, and `-T`/`--temporary-directory` in separated, attached, equals, uniquely abbreviated long-option, and clustered short-option forms accepted by GNU option parsing. Covered examples include `--comp`, `--out`, `--files`, `--temp`, `-oFILE`, `-T/tmp`, `-roFILE`, and `-rT/tmp`.
-- Stop option parsing at a discrete `--`; later tokens are operands and MUST NOT be rejected merely because their filenames resemble prohibited options.
+- Reject `--compress-program`, `-o`/`--output`, `--files0-from`, and `-T`/`--temporary-directory` in separated, attached, equals, uniquely abbreviated long-option, and clustered short-option forms accepted by GNU option parsing. This includes the shortest unique forms `--co`, `--o`, `--fil`, and `--t`.
+- Scan all arguments, including options after operands as GNU permutation permits, and stop only at a discrete `--`; later tokens are operands and MUST NOT be rejected merely because their filenames resemble prohibited options.
 - Reject direct output options rather than duplicating redirection containment inside `sort` option parsing. Reject file-list and temporary-directory options because they introduce file access outside the validated argv/redirection boundary.
 - Do not reject `-S` or `--buffer-size` solely because it influences temporary-file use; it does not itself name a path or executable.
 - Preserve ordinary allowlisted sorting, harmless ordering options, and option-like filenames after `--`.
@@ -47,10 +47,11 @@ These behaviors remain one proposal because the option policy, no-side-effect re
 
 ## Acceptance Criteria
 
-- `sort` and `gsort` reject full and uniquely abbreviated dangerous long options, including separated and equals forms such as `--compress-program`, `--comp`, `--output`, `--out`, `--files0-from`, `--files`, `--temporary-directory`, and `--temp`.
-- Direct-output and temporary-directory short options are rejected in separated, attached, and clustered forms including `-o FILE`, `-oFILE`, `-roFILE`, `-T DIR`, `-TDIR`, and `-rTDIR`.
+- `sort` and `gsort` reject full and uniquely abbreviated dangerous long options in separated and equals forms, including the shortest unique forms `--co`, `--o`, `--fil`, and `--t` as well as longer prefixes.
+- Direct-output and temporary-directory short options are rejected in separated, attached, and clustered forms including `-o FILE`, `-oFILE`, `-ro FILE`, `-roFILE`, `-T DIR`, `-TDIR`, `-rT DIR`, and `-rTDIR`.
+- GNU permutation is covered: a dangerous option after an operand, such as `sort input -o /tmp/outside`, is still rejected. Parsing stops only at a discrete `--`.
 - An executor-level regression proves rejection occurs before `ProcessManager.create_process`; marker and outside-output files remain absent. A GNU/Linux smoke test forces temporary-file spill with a small sort buffer and sufficient input so the external-program assertion cannot pass vacuously.
-- Ordinary commands such as `sort input`, `sort -r input`, and `sort -S 1M input` remain allowed subject to existing policy.
+- Ordinary commands such as `sort input`, `sort -r input`, `sort -S 1M input`, `sort -S1T input`, and `sort -tT -k2,2 input` remain allowed subject to existing policy; values attached to value-taking short options are not rescanned as option clusters.
 - `sort -- --output=/tmp/name` treats the option-like token as a filename operand rather than a prohibited option.
 - The full test suite and repository lint/type checks pass.
 - `CHANGELOG.md` states that `<=1.1.8` is affected and that version `1.1.9` contains the fix.
@@ -69,5 +70,6 @@ These behaviors remain one proposal because the option policy, no-side-effect re
 - Building a complete sandbox for every allowlisted executable.
 - Implementing contained support for `sort -o`; clients can use the server's existing `>` redirection syntax.
 - Rejecting `sort -S` or every resource-control option that does not itself select a path or executable.
+- Rejecting `--random-source`: ordinary sort operands already permit reading caller-selected paths, so this option does not add a new file-read capability in the current threat model.
 - Publishing package version `1.1.9`, its GitHub Release, or the advisory before the patched artifact has been built and verified; tracked by follow-up change `release-sort-hardening`.
 - Remediating unrelated command-specific argument policies in this change.

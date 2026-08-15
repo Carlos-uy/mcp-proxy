@@ -7,6 +7,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
+from mcp_shell_server.process_manager import ProcessManager
 from mcp_shell_server.shell_executor import ShellExecutor
 
 
@@ -1169,3 +1170,206 @@ async def test_audit_logging_rejection(
     assert audit_records[-1]["result_type"] == "rejected"
     assert audit_records[-1]["command"] == "rm"
     mock_process_manager.create_process.assert_not_awaited()
+
+
+# A 5000-line input paired with a 64k sort buffer is enough to make GNU sort
+# spill to temporary files, which is when --compress-program is invoked.
+SORT_SPILL_LINES = 5000
+SORT_SPILL_BUFFER = "64k"
+
+
+def _write_sort_input(path):
+    path.write_text(
+        "".join(
+            f"{(index * 7919) % 10 ** 8:08d}-{'x' * 40}\n"
+            for index in range(SORT_SPILL_LINES)
+        )
+    )
+    return path
+
+
+def _write_compress_program(path, marker):
+    """Write a compressor that records its own execution and passes data through.
+
+    GNU sort runs the program as `prog` to compress and `prog -d` to decompress,
+    so the `-d` flag is dropped before delegating to `cat`.
+    """
+    path.write_text(
+        f'#!/bin/sh\ntouch {marker}\nif [ "$1" = "-d" ]; then shift; fi\nexec cat "$@"\n'
+    )
+    path.chmod(0o755)
+    return path
+
+
+def _find_gnu_sort():
+    for candidate in ("sort", "gsort"):
+        try:
+            probe = subprocess.run(
+                [candidate, "--version"], capture_output=True, text=True
+            )
+        except OSError:
+            continue
+        if probe.returncode == 0 and "GNU coreutils" in probe.stdout:
+            return candidate
+    return None
+
+
+GNU_SORT_BINARY = _find_gnu_sort()
+
+
+@pytest.fixture
+def no_process_creation(monkeypatch):
+    """Fail loudly if validation lets a payload reach process creation."""
+    spy = AsyncMock(side_effect=AssertionError("create_process must not be reached"))
+    monkeypatch.setattr(ProcessManager, "create_process", spy)
+    return spy
+
+
+@pytest.mark.asyncio
+async def test_sort_compress_program_poc_is_rejected_without_side_effect(
+    tmp_path, monkeypatch, no_process_creation
+):
+    clear_env(monkeypatch)
+    monkeypatch.setenv("ALLOW_COMMANDS", "sort")
+    marker = tmp_path / "sort-compress-program-poc-marker"
+    program = _write_compress_program(tmp_path / "compressor", marker)
+    source = _write_sort_input(tmp_path / "input")
+
+    result = await ShellExecutor().execute(
+        [
+            "sort",
+            f"--compress-program={program}",
+            "-S",
+            SORT_SPILL_BUFFER,
+            str(source),
+        ],
+        str(tmp_path),
+    )
+
+    assert result["status"] == 1
+    assert "sort external program or path option" in result["error"]
+    assert not marker.exists()
+    no_process_creation.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_sort_abbreviated_compress_program_poc_is_rejected(
+    tmp_path, monkeypatch, no_process_creation
+):
+    clear_env(monkeypatch)
+    monkeypatch.setenv("ALLOW_COMMANDS", "sort")
+    marker = tmp_path / "sort-abbreviated-compress-poc-marker"
+    program = _write_compress_program(tmp_path / "compressor", marker)
+    source = _write_sort_input(tmp_path / "input")
+
+    result = await ShellExecutor().execute(
+        ["sort", "--co", str(program), "-S", SORT_SPILL_BUFFER, str(source)],
+        str(tmp_path),
+    )
+
+    assert result["status"] == 1
+    assert "sort external program or path option" in result["error"]
+    assert not marker.exists()
+    no_process_creation.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_sort_output_option_poc_is_rejected_without_side_effect(
+    tmp_path, monkeypatch, no_process_creation
+):
+    clear_env(monkeypatch)
+    monkeypatch.setenv("ALLOW_COMMANDS", "sort")
+    work = tmp_path / "work"
+    work.mkdir()
+    source = _write_sort_input(work / "input")
+    outside = tmp_path / "sort-outside-output"
+
+    result = await ShellExecutor().execute(
+        ["sort", "-o", str(outside), str(source)], str(work)
+    )
+
+    assert result["status"] == 1
+    assert "sort external program or path option" in result["error"]
+    assert not outside.exists()
+    no_process_creation.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_sort_clustered_output_option_after_operand_is_rejected(
+    tmp_path, monkeypatch, no_process_creation
+):
+    """GNU option permutation must not smuggle an output path past validation."""
+    clear_env(monkeypatch)
+    monkeypatch.setenv("ALLOW_COMMANDS", "sort")
+    work = tmp_path / "work"
+    work.mkdir()
+    source = _write_sort_input(work / "input")
+    outside = tmp_path / "sort-permuted-output"
+
+    result = await ShellExecutor().execute(
+        ["sort", str(source), f"-ro{outside}"], str(work)
+    )
+
+    assert result["status"] == 1
+    assert "sort external program or path option" in result["error"]
+    assert not outside.exists()
+    no_process_creation.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_sort_temporary_directory_option_is_rejected(
+    tmp_path, monkeypatch, no_process_creation
+):
+    clear_env(monkeypatch)
+    monkeypatch.setenv("ALLOW_COMMANDS", "sort")
+    work = tmp_path / "work"
+    work.mkdir()
+    source = _write_sort_input(work / "input")
+    outside = tmp_path / "sort-outside-temp"
+    outside.mkdir()
+
+    result = await ShellExecutor().execute(
+        ["sort", "-T", str(outside), "-S", SORT_SPILL_BUFFER, str(source)], str(work)
+    )
+
+    assert result["status"] == 1
+    assert "sort external program or path option" in result["error"]
+    assert list(outside.iterdir()) == []
+    no_process_creation.assert_not_awaited()
+
+
+@pytest.mark.skipif(
+    GNU_SORT_BINARY is None,
+    reason="GNU coreutils sort is required to force a temporary-file spill",
+)
+@pytest.mark.asyncio
+async def test_sort_compress_program_spill_is_forced_before_rejection(
+    tmp_path, monkeypatch
+):
+    """Prove the rejected payload really executes an external program when allowed.
+
+    Without this smoke path the "external program did not run" assertions could
+    pass simply because the payload never made GNU sort spill to disk.
+    """
+    marker = tmp_path / "sort-spill-marker"
+    program = _write_compress_program(tmp_path / "compressor", marker)
+    source = _write_sort_input(tmp_path / "input")
+    argv = [
+        GNU_SORT_BINARY,
+        f"--compress-program={program}",
+        "-S",
+        SORT_SPILL_BUFFER,
+        str(source),
+    ]
+
+    subprocess.run(argv, stdout=subprocess.DEVNULL, check=True)
+    assert marker.exists(), "the payload did not force a temporary-file spill"
+    marker.unlink()
+
+    clear_env(monkeypatch)
+    monkeypatch.setenv("ALLOW_COMMANDS", GNU_SORT_BINARY)
+    result = await ShellExecutor().execute(argv, str(tmp_path))
+
+    assert result["status"] == 1
+    assert "sort external program or path option" in result["error"]
+    assert not marker.exists()

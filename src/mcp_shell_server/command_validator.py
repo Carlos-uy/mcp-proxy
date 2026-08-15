@@ -57,10 +57,61 @@ COMMAND_POLICY_ALIASES = {
     "bsdtar": "tar",
     "gawk": "awk",
     "gfind": "find",
+    "gsort": "sort",
     "gtar": "tar",
     "mawk": "awk",
     "nawk": "awk",
 }
+
+# GNU coreutils `sort` long options mapped to whether they consume a separate
+# value argument. The table exists so abbreviated options can be resolved the
+# way getopt_long resolves them, and so benign option values are never rescanned
+# as options themselves.
+SORT_LONG_OPTIONS: Dict[str, bool] = {
+    "batch-size": True,
+    "buffer-size": True,
+    "check": False,  # value is optional and only accepted as `--check=DIAG`
+    "compress-program": True,
+    "debug": False,
+    "dictionary-order": False,
+    "field-separator": True,
+    "files0-from": True,
+    "general-numeric-sort": False,
+    "help": False,
+    "human-numeric-sort": False,
+    "ignore-case": False,
+    "ignore-leading-blanks": False,
+    "ignore-nonprinting": False,
+    "key": True,
+    "merge": False,
+    "month-sort": False,
+    "numeric-sort": False,
+    "output": True,
+    "parallel": True,
+    "random-sort": False,
+    "random-source": True,
+    "reverse": False,
+    "sort": True,
+    "stable": False,
+    "temporary-directory": True,
+    "unique": False,
+    "version": False,
+    "version-sort": False,
+    "zero-terminated": False,
+}
+# Options that select an external program, an output path, an external input
+# file list, or an external temporary directory.
+SORT_PROHIBITED_LONG_OPTIONS = {
+    "compress-program",
+    "files0-from",
+    "output",
+    "temporary-directory",
+}
+SORT_SHORT_OPTIONS_WITH_VALUE = {"k", "o", "S", "t", "T"}
+SORT_PROHIBITED_SHORT_OPTIONS = {"o", "T"}
+SORT_POLICY_ERROR = (
+    "Command rejected by default security policy: sort external program or path option"
+)
 
 
 class CommandValidator:
@@ -162,6 +213,53 @@ class CommandValidator:
             index += 2 if arg in options_with_value else 1
         return None
 
+    def _sort_long_option_candidates(self, name: str) -> set[str]:
+        """Resolve a `sort` long option name the way getopt_long resolves it.
+
+        An exact name wins outright; otherwise every option the token
+        abbreviates stays a candidate. GNU sort rejects ambiguous abbreviations,
+        so treating each candidate as reachable only makes the policy stricter.
+        """
+        if name in SORT_LONG_OPTIONS:
+            return {name}
+        return {option for option in SORT_LONG_OPTIONS if option.startswith(name)}
+
+    def _validate_sort_arguments(self, args: List[str]) -> None:
+        """Reject `sort` options that reach outside the validated argv boundary.
+
+        GNU option permutation allows options after operands, so every argument
+        is scanned until a discrete `--`; tokens after it are filename operands
+        even when they look like options.
+        """
+        index = 0
+        while index < len(args):
+            arg = args[index]
+            index += 1
+            if arg == "--":
+                return
+            if arg == "-" or not arg.startswith("-"):
+                continue
+            if arg.startswith("--"):
+                name, separator, _value = arg[2:].partition("=")
+                candidates = self._sort_long_option_candidates(name)
+                if candidates & SORT_PROHIBITED_LONG_OPTIONS:
+                    raise ValueError(SORT_POLICY_ERROR)
+                if not separator and len(candidates) == 1:
+                    (resolved,) = candidates
+                    if SORT_LONG_OPTIONS[resolved]:
+                        index += 1
+                continue
+            for position, letter in enumerate(arg[1:], start=1):
+                if letter in SORT_PROHIBITED_SHORT_OPTIONS:
+                    raise ValueError(SORT_POLICY_ERROR)
+                if letter in SORT_SHORT_OPTIONS_WITH_VALUE:
+                    # The value is either the rest of this token or the next
+                    # argument. Either way it is data, so it must not be
+                    # rescanned as further clustered option letters.
+                    if position == len(arg) - 1:
+                        index += 1
+                    break
+
     def _policy_command_name(self, command: str) -> str:
         cmd = os.path.basename(self._validate_command_name_form(command))
         if re.fullmatch(r"python\d+(?:\.\d+)*", cmd):
@@ -210,6 +308,9 @@ class CommandValidator:
             raise ValueError(
                 "Command rejected by default security policy: tar command execution option"
             )
+
+        if cmd == "sort":
+            self._validate_sort_arguments(args)
 
         if cmd == "git":
             subcommand_index = self._git_subcommand_index(args)

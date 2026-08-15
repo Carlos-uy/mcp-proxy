@@ -339,3 +339,91 @@ def test_git_subcommand_c_option_is_allowed(validator, monkeypatch):
     monkeypatch.setenv("ALLOW_COMMANDS", "git")
 
     validator.validate_command(["git", "commit", "-c", "HEAD", "--dry-run"])
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        # Full long forms, equals and separated.
+        ["sort", "--compress-program=/tmp/program", "input"],
+        ["sort", "--compress-program", "/tmp/program", "input"],
+        ["sort", "--output=/tmp/outside", "input"],
+        ["sort", "--output", "/tmp/outside", "input"],
+        ["sort", "--files0-from=/tmp/list"],
+        ["sort", "--files0-from", "/tmp/list"],
+        ["sort", "--temporary-directory=/tmp/elsewhere", "input"],
+        ["sort", "--temporary-directory", "/tmp/elsewhere", "input"],
+        # Shortest unique abbreviations.
+        ["sort", "--co=/tmp/program", "input"],
+        ["sort", "--co", "/tmp/program", "input"],
+        ["sort", "--o=/tmp/outside", "input"],
+        ["sort", "--o", "/tmp/outside", "input"],
+        ["sort", "--fil=/tmp/list"],
+        ["sort", "--fil", "/tmp/list"],
+        ["sort", "--t=/tmp/elsewhere", "input"],
+        ["sort", "--t", "/tmp/elsewhere", "input"],
+        # Longer abbreviations.
+        ["sort", "--comp=/tmp/program", "input"],
+        ["sort", "--outp", "/tmp/outside", "input"],
+        ["sort", "--files0", "/tmp/list"],
+        ["sort", "--temp=/tmp/elsewhere", "input"],
+        # Short forms: separated, attached, and clustered.
+        ["sort", "-o", "/tmp/outside", "input"],
+        ["sort", "-o/tmp/outside", "input"],
+        ["sort", "-ro", "/tmp/outside", "input"],
+        ["sort", "-ro/tmp/outside", "input"],
+        ["sort", "-T", "/tmp/elsewhere", "input"],
+        ["sort", "-T/tmp/elsewhere", "input"],
+        ["sort", "-rT", "/tmp/elsewhere", "input"],
+        ["sort", "-rT/tmp/elsewhere", "input"],
+        # GNU permutation places the option after an operand.
+        ["sort", "input", "-o", "/tmp/outside"],
+        ["sort", "input", "--compress-program=/tmp/program"],
+        # The gsort alias shares the policy.
+        ["gsort", "--co=/tmp/program", "input"],
+        ["gsort", "--o=/tmp/outside", "input"],
+        ["gsort", "-ro", "/tmp/outside", "input"],
+        ["gsort", "-rT", "/tmp/elsewhere", "input"],
+        # Absolute paths resolve to the same policy command name.
+        ["/usr/bin/sort", "-o", "/tmp/outside", "input"],
+    ],
+)
+def test_sort_external_program_and_path_options_are_rejected(
+    validator, monkeypatch, command
+):
+    clear_env(monkeypatch)
+    monkeypatch.setenv("ALLOW_COMMANDS", "sort,gsort,/usr/bin/sort")
+
+    with pytest.raises(ValueError, match="sort external program or path option"):
+        validator.validate_command(command)
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        ["sort", "input"],
+        ["sort", "-r", "input"],
+        ["sort", "-u", "-n", "input"],
+        ["sort", "-S", "1M", "input"],
+        # `1T` is the value of -S, not a clustered -T option.
+        ["sort", "-S1T", "input"],
+        # `T` is the field separator, not a clustered -T option.
+        ["sort", "-tT", "-k2,2", "input"],
+        ["sort", "-rk2,2", "input"],
+        ["sort", "--buffer-size=1T", "input"],
+        ["sort", "--field-separator", "T", "input"],
+        ["sort", "--key", "2,2", "input"],
+        ["sort", "--parallel", "4", "input"],
+        ["sort", "--random-source=/dev/urandom", "input"],
+        # Option-like tokens after `--` are filename operands.
+        ["sort", "--", "--output=/tmp/name"],
+        ["sort", "--", "-o", "/tmp/name"],
+        ["gsort", "-S1T", "input"],
+        ["/usr/bin/sort", "-r", "input"],
+    ],
+)
+def test_ordinary_sort_arguments_remain_allowed(validator, monkeypatch, command):
+    clear_env(monkeypatch)
+    monkeypatch.setenv("ALLOW_COMMANDS", "sort,gsort,/usr/bin/sort")
+
+    validator.validate_command(command)

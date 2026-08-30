@@ -27,7 +27,7 @@ RUN apt-get update \
 # No pasa por apt/dpkg, no queda vendorizado en este repo:
 # la próxima vez que se reconstruya esta imagen con --pull,
 # se trae automáticamente la versión que sea "latest" en Docker Hub.
-COPY --from=crowdsec-src /usr/bin/cscli /usr/local/bin/cscli
+COPY --from=crowdsec-src /usr/local/bin/cscli /usr/local/bin/cscli
 RUN chmod +x /usr/local/bin/cscli
 
 # mcp-proxy: bridge stdio -> SSE/HTTP

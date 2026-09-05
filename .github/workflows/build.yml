@@ -1,4 +1,4 @@
-name: Build and push mcp_proxy
+name: Build and push mcp-proxy
 
 on:
   push:
@@ -48,5 +48,5 @@ jobs:
           pull: true
           no-cache: true
           tags: |
-            ghcr.io/carlos-uy/mcp_proxy:${{ steps.tag.outputs.tag }}
-            ghcr.io/carlos-uy/mcp_proxy:${{ github.sha }}
+            ghcr.io/carlos-uy/mcp-proxy:${{ steps.tag.outputs.tag }}
+            ghcr.io/carlos-uy/mcp-proxy:${{ github.sha }}

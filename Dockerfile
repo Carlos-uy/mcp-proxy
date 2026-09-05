@@ -34,12 +34,13 @@ RUN chmod +x /usr/local/bin/cscli
 # mcp-shell-server: ejecuta el comando whitelisteado (cscli) vía stdio
 RUN pip install --no-cache-dir mcp-proxy mcp-shell-server
 
-ENV ALLOW_COMMANDS="cscli"
 ENV MCP_PORT=8000
 
-# servers.json define cada servidor MCP nombrado (crowdsec, y los que
-# se agreguen a futuro) con su propio comando y su propio entorno,
-# aislados entre sí dentro del mismo proceso de mcp-proxy.
+# servers.json es el default de fallback horneado en la imagen.
+# En producción se monta por volumen desde la NAS
+# (/DATA/AppData/mcp-crowdsec-gateway/servers.json -> /app/servers.json),
+# así que agregar/ajustar servidores o su ALLOW_COMMANDS no requiere
+# rebuild: solo editar el archivo en la NAS y reiniciar el contenedor.
 COPY servers.json /app/servers.json
 
 EXPOSE 8000
@@ -47,8 +48,7 @@ EXPOSE 8000
 # mcp-proxy lee servers.json y levanta cada servidor nombrado como
 # subproceso stdio, exponiéndolos por SSE en:
 #   http://0.0.0.0:$MCP_PORT/servers/<nombre>/sse
-# --pass-environment es obligatorio: por defecto mcp-proxy NO hereda
-# el entorno del contenedor hacia los subprocesos, así que sin esto
-# el ALLOW_COMMANDS definido en el env de cada servidor no se aplicaría
-# igual (queda como refuerzo; cada servidor ya trae su propio env en el JSON).
+# --pass-environment reenvía variables del contenedor a los subprocesos
+# (por ejemplo CROWDSEC_LAPI_URL); el ALLOW_COMMANDS de cada servidor
+# ya viene definido en su propio bloque "env" dentro de servers.json.
 ENTRYPOINT ["sh", "-c", "mcp-proxy --pass-environment --port=${MCP_PORT} --host=0.0.0.0 --named-server-config /app/servers.json"]

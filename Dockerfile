@@ -19,8 +19,13 @@ FROM python:3.13-slim AS base
 WORKDIR /app
 
 # Dependencias mínimas de sistema (certificados para TLS de cscli)
+# + Node.js: necesario para "npx" (usado por servidores MCP oficiales
+# de Anthropic como @modelcontextprotocol/server-filesystem).
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends ca-certificates \
+    && apt-get install -y --no-install-recommends ca-certificates curl gnupg \
+    && mkdir -p /etc/apt/keyrings \
+    && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y --no-install-recommends nodejs \
     && rm -rf /var/lib/apt/lists/*
 
 # Copiamos SOLO el binario cscli desde la imagen oficial.

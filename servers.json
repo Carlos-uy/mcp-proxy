@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "crowdsec": {
+      "enabled": true,
+      "command": "mcp-shell-server",
+      "env": {
+        "ALLOW_COMMANDS": "cscli,ls,find"
+      }
+    }
+  }
+}

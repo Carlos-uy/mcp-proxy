@@ -2,11 +2,11 @@ name: Build and push mcp-crowdsec-gateway
 
 on:
   push:
-    branches: [main]
+    branches: [main, multiserver-test]
   schedule:
     # Rebuild semanal (lunes 06:00 UTC) para arrastrar automáticamente
     # cualquier actualización de crowdsecurity/crowdsec:latest, incluso
-    # sin cambios en este repo.
+    # sin cambios en este repo. Solo aplica a main.
     - cron: "0 6 * * 1"
   workflow_dispatch: {}
 
@@ -31,6 +31,15 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Definir tag según la rama
+        id: tag
+        run: |
+          if [ "${{ github.ref_name }}" = "main" ]; then
+            echo "tag=latest" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Build and push (sin cache, pull de imágenes base)
         uses: docker/build-push-action@v6
         with:
@@ -39,5 +48,5 @@ jobs:
           pull: true
           no-cache: true
           tags: |
-            ghcr.io/carlos-uy/mcp-crowdsec-gateway:latest
+            ghcr.io/carlos-uy/mcp-crowdsec-gateway:${{ steps.tag.outputs.tag }}
             ghcr.io/carlos-uy/mcp-crowdsec-gateway:${{ github.sha }}

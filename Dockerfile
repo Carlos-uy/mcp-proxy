@@ -37,7 +37,7 @@ RUN chmod +x /usr/local/bin/cscli
 
 # mcp-proxy: bridge stdio -> SSE/HTTP
 # mcp-shell-server: ejecuta el comando whitelisteado (cscli) vía stdio
-RUN pip install --no-cache-dir mcp-proxy mcp-shell-server httpx
+RUN pip install --no-cache-dir mcp-proxy mcp-shell-server httpx boto3
 
 # uv/uvx: equivalente Python de "npx" — crea entornos efímeros al vuelo
 # para correr paquetes sin instalarlos globalmente. Necesario para

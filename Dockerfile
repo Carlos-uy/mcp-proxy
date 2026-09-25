@@ -62,3 +62,5 @@ EXPOSE 8000
 # (por ejemplo CROWDSEC_LAPI_URL); el ALLOW_COMMANDS de cada servidor
 # ya viene definido en su propio bloque "env" dentro de servers.json.
 ENTRYPOINT ["sh", "-c", "mcp-proxy --pass-environment --port=${MCP_PORT} --host=0.0.0.0 --named-server-config /app/servers.json"]
+
+RUN pip install --no-cache-dir httpx

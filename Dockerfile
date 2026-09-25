@@ -16,8 +16,6 @@ FROM crowdsecurity/crowdsec:latest AS crowdsec-src
 # ─────────────────────────────────────────────────────────────
 FROM python:3.13-slim AS base
 
-RUN pip install --no-cache-dir httpx
-
 WORKDIR /app
 
 # Dependencias mínimas de sistema (certificados para TLS de cscli)
@@ -39,7 +37,7 @@ RUN chmod +x /usr/local/bin/cscli
 
 # mcp-proxy: bridge stdio -> SSE/HTTP
 # mcp-shell-server: ejecuta el comando whitelisteado (cscli) vía stdio
-RUN pip install --no-cache-dir mcp-proxy mcp-shell-server
+RUN pip install --no-cache-dir mcp-proxy mcp-shell-server httpx
 
 # uv/uvx: equivalente Python de "npx" — crea entornos efímeros al vuelo
 # para correr paquetes sin instalarlos globalmente. Necesario para

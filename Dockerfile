@@ -44,6 +44,9 @@ RUN pip install --no-cache-dir mcp-proxy mcp-shell-server httpx boto3
 # cualquier servidor MCP futuro que se invoque como "uvx <paquete>".
 RUN pip install --no-cache-dir uv
 
+# Agrega capacideades de NMAP https://nmap.org/book/man.html
+RUN apt-get update && apt-get install -y --no-install-recommends nmap && rm -rf /var/lib/apt/lists/*
+
 ENV MCP_PORT=8000
 
 # servers.json es el default de fallback horneado en la imagen.

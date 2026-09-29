@@ -27,6 +27,18 @@ FROM python:3.13-slim AS base
 
 WORKDIR /app
 
+# Dependencias mínimas de sistema. python:3.13-slim viene sin wget,
+# curl NI unzip — este bloque tiene que ir ANTES de cualquier RUN que
+# los necesite (Katana más abajo usa curl+unzip).
+# ca-certificates: TLS para cscli. curl+gnupg: setup de NodeSource.
+# unzip: para descomprimir el binario de Katana.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates curl gnupg unzip \
+    && mkdir -p /etc/apt/keyrings \
+    && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y --no-install-recommends nodejs \
+    && rm -rf /var/lib/apt/lists/*
+
 # ─────────────────────────────────────────────────────────────
 # Katana — crawler activo de ProjectDiscovery para extracción de
 # endpoints (incluye los que solo aparecen en JavaScript, no
@@ -38,21 +50,14 @@ WORKDIR /app
 # momento, no una fija. Si en algún momento un release rompe algo,
 # reemplazá "latest" por un tag explícito (ej. v2.4.4) en la URL de
 # releases: https://github.com/projectdiscovery/katana/releases
+#
+# Usa curl (no wget) porque curl ya se instaló arriba para Node.js —
+# evita sumar una segunda herramienta que hace lo mismo.
 # ─────────────────────────────────────────────────────────────
-RUN wget -qO /tmp/katana.zip https://github.com/projectdiscovery/katana/releases/latest/download/katana_2.4.4_linux_amd64.zip \
+RUN curl -fsSL -o /tmp/katana.zip https://github.com/projectdiscovery/katana/releases/latest/download/katana_2.4.4_linux_amd64.zip \
     && unzip /tmp/katana.zip -d /usr/local/bin katana \
     && chmod +x /usr/local/bin/katana \
     && rm /tmp/katana.zip
-
-# Dependencias mínimas de sistema (certificados para TLS de cscli)
-# + Node.js: necesario para "npx" (usado por servidores MCP oficiales
-# de Anthropic como @modelcontextprotocol/server-filesystem).
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends ca-certificates curl gnupg \
-    && mkdir -p /etc/apt/keyrings \
-    && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
-    && apt-get install -y --no-install-recommends nodejs \
-    && rm -rf /var/lib/apt/lists/*
 
 # Copiamos SOLO el binario cscli desde la imagen oficial.
 # No pasa por apt/dpkg, no queda vendorizado en este repo:

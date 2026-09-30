@@ -45,16 +45,23 @@ RUN apt-get update \
 # linkeados en el HTML). Repo: https://github.com/projectdiscovery/katana
 # Manual/flags: https://docs.projectdiscovery.io/tools/katana/overview
 #
-# ⚠️ Pin de versión: la URL usa "latest", igual que el binario cscli
-# de arriba — cada build trae la versión que esté publicada en ese
-# momento, no una fija. Si en algún momento un release rompe algo,
-# reemplazá "latest" por un tag explícito (ej. v2.4.4) en la URL de
-# releases: https://github.com/projectdiscovery/katana/releases
+# Resuelve "latest" DINÁMICAMENTE en cada build, pero sin pasar por
+# la API REST (api.github.com/repos/.../releases/latest) — esa API
+# tiene rate limit de 60 requests/hora sin autenticar por IP, y se
+# agota rápido con varios rebuilds seguidos. En cambio, se sigue el
+# redirect propio de la página de releases (github.com, no la API),
+# que no comparte ese límite: /releases/latest redirige a
+# /releases/tag/<version-real>, de ahí se saca el tag y se arma la
+# URL de descarga del asset directo — el binario que se instala
+# siempre es la versión que esté publicada como "latest" en ese
+# momento, no una fija.
 #
 # Usa curl (no wget) porque curl ya se instaló arriba para Node.js —
 # evita sumar una segunda herramienta que hace lo mismo.
 # ─────────────────────────────────────────────────────────────
-RUN curl -fsSL -o /tmp/katana.zip https://github.com/projectdiscovery/katana/releases/latest/download/katana_2.4.4_linux_amd64.zip \
+RUN KATANA_TAG=$(curl -fsSL -o /dev/null -w '%{url_effective}' https://github.com/projectdiscovery/katana/releases/latest | grep -oE '[^/]+$') \
+    && KATANA_VERSION="${KATANA_TAG#v}" \
+    && curl -fsSL -o /tmp/katana.zip "https://github.com/projectdiscovery/katana/releases/download/${KATANA_TAG}/katana_${KATANA_VERSION}_linux_amd64.zip" \
     && unzip /tmp/katana.zip -d /usr/local/bin katana \
     && chmod +x /usr/local/bin/katana \
     && rm /tmp/katana.zip

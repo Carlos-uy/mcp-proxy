@@ -66,6 +66,20 @@ RUN KATANA_TAG=$(curl -fsSL -o /dev/null -w '%{url_effective}' https://github.co
     && chmod +x /usr/local/bin/katana \
     && rm /tmp/katana.zip
 
+# ─────────────────────────────────────────────────────────────
+# Subfinder — enumeración PASIVA de subdominios (ProjectDiscovery),
+# nunca toca el dominio en sí. Repo: https://github.com/projectdiscovery/subfinder
+# Mismo patrón que Katana: resuelve "latest" por el redirect de
+# github.com (no la API, evita su rate limit). Funciona sin API key;
+# para más cobertura acepta claves opcionales en provider-config.yaml.
+# ─────────────────────────────────────────────────────────────
+RUN SUBFINDER_TAG=$(curl -fsSL -o /dev/null -w '%{url_effective}' https://github.com/projectdiscovery/subfinder/releases/latest | grep -oE '[^/]+$') \
+    && SUBFINDER_VERSION="${SUBFINDER_TAG#v}" \
+    && curl -fsSL -o /tmp/subfinder.zip "https://github.com/projectdiscovery/subfinder/releases/download/${SUBFINDER_TAG}/subfinder_${SUBFINDER_VERSION}_linux_amd64.zip" \
+    && unzip /tmp/subfinder.zip -d /usr/local/bin subfinder \
+    && chmod +x /usr/local/bin/subfinder \
+    && rm /tmp/subfinder.zip
+
 # Copiamos SOLO el binario cscli desde la imagen oficial.
 # No pasa por apt/dpkg, no queda vendorizado en este repo:
 # la próxima vez que se reconstruya esta imagen con --pull,

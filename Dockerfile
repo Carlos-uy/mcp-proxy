@@ -27,17 +27,22 @@ FROM python:3.13-slim AS base
 
 WORKDIR /app
 
-# Dependencias mínimas de sistema. python:3.13-slim viene sin wget,
-# curl NI unzip — este bloque tiene que ir ANTES de cualquier RUN que
-# los necesite (Katana más abajo usa curl+unzip).
-# ca-certificates: TLS para cscli. curl+gnupg: setup de NodeSource.
-# unzip: para descomprimir el binario de Katana.
+# Dependencias mínimas de sistema: ca-certificates, curl, gnupg, unzip, xz-utils
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends ca-certificates curl gnupg unzip \
-    && mkdir -p /etc/apt/keyrings \
-    && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
-    && apt-get install -y --no-install-recommends nodejs \
+    && apt-get install -y --no-install-recommends ca-certificates curl unzip xz-utils \
     && rm -rf /var/lib/apt/lists/*
+
+# Node.js — instala siempre la última versión LTS disponible
+RUN NODE_VERSION=$(python3 -c "
+import json, urllib.request
+data = json.load(urllib.request.urlopen('https://nodejs.org/dist/index.json'))
+print(next(r['version'] for r in data if r['lts']))
+") \
+    && echo "Instalando Node.js ${NODE_VERSION} (última LTS)" \
+    && curl -fsSL -o /tmp/node.tar.xz "https://nodejs.org/dist/${NODE_VERSION}/node-${NODE_VERSION}-linux-x64.tar.xz" \
+    && tar -xJf /tmp/node.tar.xz -C /usr/local --strip-components=1 \
+    && rm /tmp/node.tar.xz \
+    && node --version && npm --version
 
 # ─────────────────────────────────────────────────────────────
 # Katana — crawler activo de ProjectDiscovery para extracción de

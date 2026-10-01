@@ -95,6 +95,11 @@ RUN chmod +x /usr/local/bin/cscli
 # se descartó (ver historial) — candidato a sacar si no se usa más.
 RUN pip install --no-cache-dir mcp-proxy mcp-shell-server httpx boto3
 
+# Librerías del server WebScraper: trafilatura (texto limpio + metadata),
+# extruct (datos estructurados: JSON-LD/Open Graph), beautifulsoup4+lxml
+# (links/tablas/imágenes de la página). httpx ya está arriba, no se repite.
+RUN pip install --no-cache-dir trafilatura extruct beautifulsoup4 lxml lxml-html-clean
+
 # uv/uvx: equivalente Python de "npx" — crea entornos efímeros al vuelo
 # para correr paquetes sin instalarlos globalmente. Necesario para
 # cualquier servidor MCP futuro que se invoque como "uvx <paquete>".

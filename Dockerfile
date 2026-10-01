@@ -33,17 +33,12 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 # Node.js — instala siempre la última versión LTS disponible
-RUN NODE_VERSION=$(python3 -c "
-import json, urllib.request
-data = json.load(urllib.request.urlopen('https://nodejs.org/dist/index.json'))
-print(next(r['version'] for r in data if r['lts']))
-") \
+RUN NODE_VERSION=$(python3 -c "import json, urllib.request; data = json.load(urllib.request.urlopen('https://nodejs.org/dist/index.json')); print(next(r['version'] for r in data if r['lts']))") \
     && echo "Instalando Node.js ${NODE_VERSION} (última LTS)" \
     && curl -fsSL -o /tmp/node.tar.xz "https://nodejs.org/dist/${NODE_VERSION}/node-${NODE_VERSION}-linux-x64.tar.xz" \
     && tar -xJf /tmp/node.tar.xz -C /usr/local --strip-components=1 \
     && rm /tmp/node.tar.xz \
     && node --version && npm --version
-
 # ─────────────────────────────────────────────────────────────
 # Katana — crawler activo de ProjectDiscovery para extracción de
 # endpoints (incluye los que solo aparecen en JavaScript, no

@@ -39,6 +39,14 @@ RUN NODE_VERSION=$(python3 -c "import json, urllib.request; data = json.load(url
     && tar -xJf /tmp/node.tar.xz -C /usr/local --strip-components=1 \
     && rm /tmp/node.tar.xz \
     && node --version && npm --version
+
+# Dependencias de sistema que necesita Chromium headless (para DocsMCP).
+# En vez de mantener la lista de paquetes a mano, se la pedimos a
+# Playwright mismo (install-deps calcula la lista correcta para la
+# versión exacta de Debian de esta imagen) — mismo criterio que usamos
+# para resolver "latest" en Katana/Subfinder/Node en vez de hardcodear.
+RUN npx -y playwright@latest install-deps chromium
+
 # ─────────────────────────────────────────────────────────────
 # Katana — crawler activo de ProjectDiscovery para extracción de
 # endpoints (incluye los que solo aparecen en JavaScript, no

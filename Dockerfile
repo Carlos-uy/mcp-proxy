@@ -81,6 +81,28 @@ RUN SUBFINDER_TAG=$(curl -fsSL -o /dev/null -w '%{url_effective}' https://github
     && chmod +x /usr/local/bin/subfinder \
     && rm /tmp/subfinder.zip
 
+# ─────────────────────────────────────────────────────────────
+# ffuf — fuerza bruta de rutas/archivos para el server MCP de red
+# (net_ffuf_scan). Repo: https://github.com/ffuf/ffuf
+# Flags: https://github.com/ffuf/ffuf/wiki/Usage-and-examples
+#
+# Mismo patrón que Katana/Subfinder arriba: resuelve "latest" siguiendo
+# el redirect de /releases/latest (no la API REST, por el rate limit de
+# 60 req/hora sin autenticar). OJO: a diferencia de Katana/Subfinder, el
+# asset de ffuf es .tar.gz, no .zip — se verificó el patrón de nombre
+# contra el .goreleaser.yml oficial del repo (name_template de la
+# sección "archives") y contra el listado real de assets de una release
+# publicada: ffuf_<version>_linux_amd64.tar.gz (sin "v" en la versión).
+# Se extrae con tar (ya disponible en la imagen base de Debian, no hace
+# falta instalarlo), no con unzip.
+# ─────────────────────────────────────────────────────────────
+RUN FFUF_TAG=$(curl -fsSL -o /dev/null -w '%{url_effective}' https://github.com/ffuf/ffuf/releases/latest | grep -oE '[^/]+$') \
+    && FFUF_VERSION="${FFUF_TAG#v}" \
+    && curl -fsSL -o /tmp/ffuf.tar.gz "https://github.com/ffuf/ffuf/releases/download/${FFUF_TAG}/ffuf_${FFUF_VERSION}_linux_amd64.tar.gz" \
+    && tar -xzf /tmp/ffuf.tar.gz -C /usr/local/bin ffuf \
+    && chmod +x /usr/local/bin/ffuf \
+    && rm /tmp/ffuf.tar.gz
+
 # Copiamos SOLO el binario cscli desde la imagen oficial.
 # No pasa por apt/dpkg, no queda vendorizado en este repo:
 # la próxima vez que se reconstruya esta imagen con --pull,

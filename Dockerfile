@@ -107,12 +107,15 @@ RUN FFUF_TAG=$(curl -fsSL -o /dev/null -w '%{url_effective}' https://github.com/
 # httpx (ProjectDiscovery) — toolkit de recon HTTP a escala para el server
 # MCP de red (net_httpx_probe). Repo: https://github.com/projectdiscovery/httpx
 #
-# ⚠️ NO CONFUNDIR con el paquete Python "httpx" (encode/httpx) instalado
-# más abajo para el MCP de Telegram — son dos proyectos sin relación que
-# comparten nombre por casualidad. Este es un binario Go que queda en
-# /usr/local/bin/httpx; el otro es una librería que vive en site-packages
-# de Python. Conviven sin conflicto real (namespaces distintos), esta nota
-# es solo para que no confunda a quien lea este archivo después.
+# ⚠️ COLISIÓN DE NOMBRES REAL (no teórica): el paquete Python "httpx"
+# (encode/httpx), instalado más abajo con pip para el MCP de Telegram,
+# ADEMÁS de la librería instala un console-script ejecutable en
+# /usr/local/bin/httpx. Como ese pip corre DESPUÉS de este bloque, pisaba
+# al binario Go de ProjectDiscovery y net_httpx_probe terminaba ejecutando
+# el CLI de Python (que no entiende los flags de PD) → "sin respuestas".
+# Solución: instalamos el binario de ProjectDiscovery con nombre PROPIO
+# `httpx-pd`, así nunca colisiona. El server MCP de red llama a `httpx-pd`;
+# el `httpx` pelado queda para el CLI/librería de Python.
 #
 # Mismo patrón que Katana/Subfinder: resuelve "latest" siguiendo el
 # redirect de /releases/latest (no la API REST, por el rate limit de 60
@@ -122,9 +125,10 @@ RUN FFUF_TAG=$(curl -fsSL -o /dev/null -w '%{url_effective}' https://github.com/
 RUN HTTPX_TAG=$(curl -fsSL -o /dev/null -w '%{url_effective}' https://github.com/projectdiscovery/httpx/releases/latest | grep -oE '[^/]+$') \
     && HTTPX_VERSION="${HTTPX_TAG#v}" \
     && curl -fsSL -o /tmp/httpx.zip "https://github.com/projectdiscovery/httpx/releases/download/${HTTPX_TAG}/httpx_${HTTPX_VERSION}_linux_amd64.zip" \
-    && unzip /tmp/httpx.zip -d /usr/local/bin httpx \
-    && chmod +x /usr/local/bin/httpx \
-    && rm /tmp/httpx.zip
+    && unzip /tmp/httpx.zip -d /tmp/httpx-pd httpx \
+    && mv /tmp/httpx-pd/httpx /usr/local/bin/httpx-pd \
+    && chmod +x /usr/local/bin/httpx-pd \
+    && rm -rf /tmp/httpx.zip /tmp/httpx-pd
 
 # ─────────────────────────────────────────────────────────────
 # naabu (ProjectDiscovery) — port scanner SYN/CONNECT de alta velocidad
@@ -161,8 +165,12 @@ RUN chmod +x /usr/local/bin/cscli
 
 # mcp-proxy: bridge stdio -> SSE/HTTP
 # mcp-shell-server: ejecuta el comando whitelisteado (cscli) vía stdio
-# httpx: cliente HTTP usado por el server MCP de Telegram (envío de
-# medios, descargas pinneadas) — repo: https://github.com/encode/httpx
+# httpx: cliente HTTP (librería) usado por el server MCP de Telegram (envío
+# de medios, descargas pinneadas) — repo: https://github.com/encode/httpx.
+# Este pip ADEMÁS instala un console-script /usr/local/bin/httpx; por eso el
+# binario Go de ProjectDiscovery se instaló arriba como `httpx-pd` (si no,
+# este pip lo pisaría). No hay conflicto: encode/httpx = /usr/local/bin/httpx
+# + librería; ProjectDiscovery = /usr/local/bin/httpx-pd.
 # boto3: SDK de AWS/S3, quedó de un intento anterior con RustFS que
 # se descartó (ver historial) — candidato a sacar si no se usa más.
 RUN pip install --no-cache-dir mcp-proxy mcp-shell-server httpx boto3

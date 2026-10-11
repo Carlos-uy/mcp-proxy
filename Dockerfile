@@ -103,6 +103,55 @@ RUN FFUF_TAG=$(curl -fsSL -o /dev/null -w '%{url_effective}' https://github.com/
     && chmod +x /usr/local/bin/ffuf \
     && rm /tmp/ffuf.tar.gz
 
+# ─────────────────────────────────────────────────────────────
+# httpx (ProjectDiscovery) — toolkit de recon HTTP a escala para el server
+# MCP de red (net_httpx_probe). Repo: https://github.com/projectdiscovery/httpx
+#
+# ⚠️ NO CONFUNDIR con el paquete Python "httpx" (encode/httpx) instalado
+# más abajo para el MCP de Telegram — son dos proyectos sin relación que
+# comparten nombre por casualidad. Este es un binario Go que queda en
+# /usr/local/bin/httpx; el otro es una librería que vive en site-packages
+# de Python. Conviven sin conflicto real (namespaces distintos), esta nota
+# es solo para que no confunda a quien lea este archivo después.
+#
+# Mismo patrón que Katana/Subfinder: resuelve "latest" siguiendo el
+# redirect de /releases/latest (no la API REST, por el rate limit de 60
+# req/hora sin autenticar). Asset .zip, verificado contra un listado real
+# de release: httpx_<version>_linux_amd64.zip.
+# ─────────────────────────────────────────────────────────────
+RUN HTTPX_TAG=$(curl -fsSL -o /dev/null -w '%{url_effective}' https://github.com/projectdiscovery/httpx/releases/latest | grep -oE '[^/]+$') \
+    && HTTPX_VERSION="${HTTPX_TAG#v}" \
+    && curl -fsSL -o /tmp/httpx.zip "https://github.com/projectdiscovery/httpx/releases/download/${HTTPX_TAG}/httpx_${HTTPX_VERSION}_linux_amd64.zip" \
+    && unzip /tmp/httpx.zip -d /usr/local/bin httpx \
+    && chmod +x /usr/local/bin/httpx \
+    && rm /tmp/httpx.zip
+
+# ─────────────────────────────────────────────────────────────
+# naabu (ProjectDiscovery) — port scanner SYN/CONNECT de alta velocidad
+# para el server MCP de red (net_naabu_scan). Repo: https://github.com/projectdiscovery/naabu
+# Pensado como descubrimiento rápido de puertos abiertos en rangos grandes,
+# complementario a nmap (que sigue siendo quien hace -sV/-O con detalle,
+# vía net_nmap_scan, una vez que naabu ya encontró qué puertos están
+# abiertos).
+#
+# Mismo patrón de resolución de "latest" + asset .zip que los anteriores,
+# verificado: naabu_<version>_linux_amd64.zip.
+#
+# El modo SYN (el rápido) necesita root + cap_add: [NET_RAW, NET_ADMIN] en
+# el compose — las mismas capabilities que ya usás, opcionalmente, para
+# NET_ENABLE_NMAP_PRIVILEGED. Sin esas capabilities, naabu sigue
+# funcionando en modo CONNECT (sin privilegios), solo que más lento y más
+# fácil de detectar. Gateado además en la app por NET_ENABLE_NAABU_PRIVILEGED
+# (ver network-mcp_server.py) — el cap_add del contenedor es necesario pero
+# no suficiente, hace falta el opt-in explícito también en la config.
+# ─────────────────────────────────────────────────────────────
+RUN NAABU_TAG=$(curl -fsSL -o /dev/null -w '%{url_effective}' https://github.com/projectdiscovery/naabu/releases/latest | grep -oE '[^/]+$') \
+    && NAABU_VERSION="${NAABU_TAG#v}" \
+    && curl -fsSL -o /tmp/naabu.zip "https://github.com/projectdiscovery/naabu/releases/download/${NAABU_TAG}/naabu_${NAABU_VERSION}_linux_amd64.zip" \
+    && unzip /tmp/naabu.zip -d /usr/local/bin naabu \
+    && chmod +x /usr/local/bin/naabu \
+    && rm /tmp/naabu.zip
+
 # Copiamos SOLO el binario cscli desde la imagen oficial.
 # No pasa por apt/dpkg, no queda vendorizado en este repo:
 # la próxima vez que se reconstruya esta imagen con --pull,

@@ -175,6 +175,9 @@ RUN chmod +x /usr/local/bin/cscli
 # se descartó (ver historial) — candidato a sacar si no se usa más.
 RUN pip install --no-cache-dir mcp-proxy mcp-shell-server httpx boto3
 
+# aiofiles: escritura asíncrona a disco. Usado actualmente por Mgr-downloader (downloader_mcp.py).
+RUN pip install --no-cache-dir aiofiles
+
 # Librerías del server WebScraper: trafilatura (texto limpio + metadata),
 # extruct (datos estructurados: JSON-LD/Open Graph), beautifulsoup4+lxml
 # (links/tablas/imágenes de la página). httpx ya está arriba, no se repite.

@@ -35,9 +35,9 @@ FROM python:3.13-slim AS base
 WORKDIR /app
 
 # Dependencias mínimas de sistema: ca-certificates, curl, unzip, xz-utils,
-# libstdc++6 (runtime de node copiado desde node-src)
+# libstdc++6 y libatomic1 (runtime de node copiado desde node-src)
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends ca-certificates curl unzip xz-utils libstdc++6 \
+    && apt-get install -y --no-install-recommends ca-certificates curl unzip xz-utils libstdc++6 libatomic1 \
     && rm -rf /var/lib/apt/lists/*
 
 # Node.js y npm copiados desde la etapa node-src (imagen oficial, LTS).

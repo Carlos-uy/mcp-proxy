@@ -7,6 +7,13 @@
 FROM crowdsecurity/crowdsec:latest AS crowdsec-src
 
 # ─────────────────────────────────────────────────────────────
+# Stage 1b: Node.js (LTS) tomado de la imagen oficial de Node.
+# Evita descargar el tarball desde nodejs.org durante el build,
+# que era lo que fallaba (exit code 127 en el RUN de Node).
+# ─────────────────────────────────────────────────────────────
+FROM node:lts-slim AS node-src
+
+# ─────────────────────────────────────────────────────────────
 # Stage 2: servidor MCP con transporte SSE
 #
 # mcp-shell-server solo habla stdio (no expone red por sí mismo).
@@ -27,17 +34,19 @@ FROM python:3.13-slim AS base
 
 WORKDIR /app
 
-# Dependencias mínimas de sistema: ca-certificates, curl, unzip, xz-utils
+# Dependencias mínimas de sistema: ca-certificates, curl, unzip, xz-utils,
+# libstdc++6 (runtime de node copiado desde node-src)
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends ca-certificates curl unzip xz-utils \
+    && apt-get install -y --no-install-recommends ca-certificates curl unzip xz-utils libstdc++6 \
     && rm -rf /var/lib/apt/lists/*
 
-# Node.js — instala siempre la última versión LTS disponible
-RUN NODE_VERSION=$(python3 -c "import json, urllib.request; data = json.load(urllib.request.urlopen('https://nodejs.org/dist/index.json')); print(next(r['version'] for r in data if r['lts']))") \
-    && echo "Instalando Node.js ${NODE_VERSION} (última LTS)" \
-    && curl -fsSL -o /tmp/node.tar.xz "https://nodejs.org/dist/${NODE_VERSION}/node-${NODE_VERSION}-linux-x64.tar.xz" \
-    && tar -xJf /tmp/node.tar.xz -C /usr/local --strip-components=1 \
-    && rm /tmp/node.tar.xz \
+# Node.js y npm copiados desde la etapa node-src (imagen oficial, LTS).
+# npx queda como symlink a npm dentro de node_modules, por eso se copian
+# ambos directorios.
+COPY --from=node-src /usr/local/bin/node /usr/local/bin/node
+COPY --from=node-src /usr/local/lib/node_modules /usr/local/lib/node_modules
+RUN ln -sf /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
+    && ln -sf /usr/local/lib/node_modules/npm/bin/npx-cli.js /usr/local/bin/npx \
     && node --version && npm --version
 
 # ─────────────────────────────────────────────────────────────

@@ -188,6 +188,11 @@ RUN pip install --no-cache-dir mcp-proxy mcp-shell-server httpx boto3
 # yt-dlp: descarga de video/audio para la herramienta download_media del mismo server.
 RUN pip install --no-cache-dir aiofiles yt-dlp
 
+# ffmpeg: une pistas de video y audio para yt-dlp (download_media).
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
+
 # Librerías del server WebScraper: trafilatura (texto limpio + metadata),
 # extruct (datos estructurados: JSON-LD/Open Graph), beautifulsoup4+lxml
 # (links/tablas/imágenes de la página). httpx ya está arriba, no se repite.

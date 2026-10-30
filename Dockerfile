@@ -185,7 +185,8 @@ RUN chmod +x /usr/local/bin/cscli
 RUN pip install --no-cache-dir mcp-proxy mcp-shell-server httpx boto3
 
 # aiofiles: escritura asíncrona a disco. Usado actualmente por Mgr-downloader (downloader_mcp.py).
-RUN pip install --no-cache-dir aiofiles
+# yt-dlp: descarga de video/audio para la herramienta download_media del mismo server.
+RUN pip install --no-cache-dir aiofiles yt-dlp
 
 # Librerías del server WebScraper: trafilatura (texto limpio + metadata),
 # extruct (datos estructurados: JSON-LD/Open Graph), beautifulsoup4+lxml

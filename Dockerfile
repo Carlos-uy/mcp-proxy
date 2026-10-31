@@ -184,14 +184,10 @@ RUN chmod +x /usr/local/bin/cscli
 # se descartó (ver historial) — candidato a sacar si no se usa más.
 RUN pip install --no-cache-dir mcp-proxy mcp-shell-server httpx boto3
 
-# aiofiles: escritura asíncrona a disco. Usado actualmente por Mgr-downloader (downloader_mcp.py).
-# yt-dlp: descarga de video/audio para la herramienta download_media del mismo server.
+# aiofiles: escritura asíncrona a disco.
+# yt-dlp es una herramienta de línea de comandos (y librería de Python) que descarga video y audio de sitios como YouTube, Vimeo y decenas de plataformas más.
+# ambas utilizadas actualmente por Mgr-downloader (downloader_mcp.py).
 RUN pip install --no-cache-dir aiofiles yt-dlp
-
-# ffmpeg: une pistas de video y audio para yt-dlp (download_media).
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends ffmpeg \
-    && rm -rf /var/lib/apt/lists/*
 
 # Librerías del server WebScraper: trafilatura (texto limpio + metadata),
 # extruct (datos estructurados: JSON-LD/Open Graph), beautifulsoup4+lxml

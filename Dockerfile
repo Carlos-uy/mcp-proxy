@@ -35,10 +35,11 @@ FROM python:3.13-slim AS base
 WORKDIR /app
 
 # Dependencias mínimas de sistema: ca-certificates, curl, unzip, xz-utils,
-# libstdc++6 y libatomic1 (runtime de node copiado desde node-src)
+# libstdc++6 y libatomic1 (runtime de node copiado desde node-src),
+# git (necesario para que uvx instale paquetes desde repositorios git)
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends ca-certificates curl unzip xz-utils libstdc++6 libatomic1 \
-    && rm -rf /var/lib/apt/lists/*
+&& apt-get install -y --no-install-recommends ca-certificates curl unzip xz-utils libstdc++6 libatomic1 git \
+&& rm -rf /var/lib/apt/lists/*
 
 # Node.js y npm copiados desde la etapa node-src (imagen oficial, LTS).
 # npx queda como symlink a npm dentro de node_modules, por eso se copian
